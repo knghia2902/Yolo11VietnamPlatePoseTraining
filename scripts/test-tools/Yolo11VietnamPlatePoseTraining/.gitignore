@@ -1,0 +1,26 @@
+# Local-only customer imagery, checkpoints, annotation state and outputs.
+*.zip
+*.pt
+*.onnx
+test_output/
+dataset*/
+__pycache__/
+reviews.json
+manifest.json
+draft-split.json
+saved-reviews/
+review-server.lock
+proposals.json
+ocr-summary.json
+group-reviews/
+group-history/
+crops/
+group-server.lock
+server.*.log
+credentials.json
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.webp
+.venv/

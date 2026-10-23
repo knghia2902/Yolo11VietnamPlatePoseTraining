@@ -1,0 +1,16 @@
+# Dataset configuration for License Plate 4-Corner Pose Estimation (YOLO11-Pose)
+path: dataset # dataset root dir
+train: images/train
+val: images/val
+
+# Keypoint shape: [num_keypoints, dim]
+# 4 corners: 0: Top-Left, 1: Top-Right, 2: Bottom-Right, 3: Bottom-Left
+# dim = 3 -> (x, y, visibility) where visibility: 0=not labeled, 1=labeled but invisible, 2=labeled and visible
+kpt_shape: [4, 3]
+
+# Disable horizontal flip for asymmetric plates
+flip_idx: []
+
+# Classes
+names:
+  0: license_plate

@@ -1,0 +1,44 @@
+# YOLO11 Pose — bốn góc biển số Việt Nam
+
+Công cụ chuẩn bị dữ liệu, duyệt nhãn và huấn luyện YOLO11n-Pose với thứ tự góc **TL → TR → BR → BL**, `kpt_shape: [4, 3]`. Mỗi ảnh hiện hỗ trợ một biển số. Đây là tooling huấn luyện độc lập, chưa tích hợp model vào Gate.
+
+## Bắt đầu
+
+1. Đọc [hướng dẫn chuẩn bị dữ liệu](docs/anpr-pose-training-preparation.md): loại trùng, đề xuất contour, duyệt bốn góc thật và nhóm xe, rồi xuất gói đã xác minh.
+2. Dùng `serve_pose_review.py` để duyệt qua LAN và lưu trên máy chủ; `review_pose.html` là giao diện duyệt góc. Không dùng bốn góc bounding box cũ làm nhãn thật mà chưa kiểm tra.
+3. Đọc [bộ mixed v2](docs/anpr-pose-mixed-v2.md) trước khi dùng notebook v2. Train v2 có ô tô và xe máy, validation v2 chỉ có xe máy.
+4. Để có validation ô tô, thực hiện [duyệt nhóm ô tô bằng đề xuất OCR](docs/anpr-car-group-review.md). `car_group_review.py` chạy OCR cục bộ, lưu duyệt có phiên bản và chỉ lập kế hoạch chia mới sau khi duyệt đủ. V3 chưa được phát hành; kế hoạch chia chưa phải bộ train hoàn chỉnh.
+
+Chạy script từ root repository. Chuẩn bị dữ liệu và kiểm thử nhẹ cần Python với Pillow; đề xuất contour cần OpenCV/NumPy. OCR nhóm ô tô dùng môi trường Python 3.12 riêng với `rapidocr_onnxruntime==1.4.4` và Pillow. Notebook tự cài phiên bản thư viện train đã pin trên Colab.
+
+## Notebook Colab
+
+- [Train_YOLO11n_Plate_Pose.ipynb](scripts/test-tools/Yolo11VietnamPlatePoseTraining/Train_YOLO11n_Plate_Pose.ipynb): bộ source-heldout ban đầu.
+- [Train_YOLO11n_Plate_Pose_Mixed_v2.ipynb](scripts/test-tools/Yolo11VietnamPlatePoseTraining/Train_YOLO11n_Plate_Pose_Mixed_v2.ipynb): cấu hình train mixed v2.
+
+Upload notebook lên Colab, chọn GPU, mount Google Drive rồi cung cấp ZIP đã duyệt đúng phiên bản. Notebook kiểm tra hash, hình học nhãn và rò rỉ trước khi train. Mặc định chạy smoke; chỉ bật `FULL_TRAIN` khi cấu hình đã đúng. Có checkpoint Drive sau mỗi epoch, resume cùng `RUN_ID`, TensorBoard, trạng thái train, validation và export ONNX từ `best.pt`. Xem tài liệu để hiểu giới hạn khi Colab/Drive ngắt.
+
+Các notebook được lưu không có output hay ảnh dữ liệu. ZIP dữ liệu, weights và kết quả train không được phát hành trong Git. Hash trong notebook ràng buộc gói đã duyệt tương ứng; nếu chuẩn bị dữ liệu mới, dùng builder để tạo notebook/gói khớp nhau, không bỏ kiểm tra hash.
+
+## Chống rò rỉ
+
+Giữ toàn bộ nhóm xe/nguồn/lượt chụp và thành phần ảnh trùng/gần trùng ở một phía. OCR chỉ đề xuất, không tự duyệt; biển số cùng xe phải được xác nhận bằng mắt. dHash không chứng minh tuyệt đối không trùng xe ở góc khác. Nếu dùng ô tô từng ở train v2 làm validation mới, train lại từ pretrained để đánh giá; không resume model đã học các ảnh đó.
+
+## Kiểm thử
+
+Từ root repository:
+
+```powershell
+python -m pip install Pillow==11.3.0
+python -m unittest discover -s tests/anpr-training
+Get-ChildItem tests/anpr-training/test_*.cjs | ForEach-Object { node $_.FullName; if ($LASTEXITCODE -ne 0) { throw "JavaScript test failed" } }
+```
+
+Các test mặc định dùng dữ liệu tổng hợp. Bài integration train CPU cần môi trường Ultralytics riêng và bật tùy chọn theo file test; mặc định được skip.
+
+Không commit ảnh, biển OCR, manifest, review JSON, credentials, checkpoint, dataset ZIP, ONNX hoặc log vận hành. Lưu chúng ngoài checkout. Không upload dữ liệu của người dùng lên GitHub khi chạy quy trình này.
+
+## Mở trực tiếp trên Colab
+
+- [Notebook ban đầu](https://colab.research.google.com/github/knghia2902/Yolo11VietnamPlatePoseTraining/blob/main/scripts/test-tools/Yolo11VietnamPlatePoseTraining/Train_YOLO11n_Plate_Pose.ipynb)
+- [Notebook mixed v2](https://colab.research.google.com/github/knghia2902/Yolo11VietnamPlatePoseTraining/blob/main/scripts/test-tools/Yolo11VietnamPlatePoseTraining/Train_YOLO11n_Plate_Pose_Mixed_v2.ipynb)

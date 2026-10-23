@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="vi"><meta charset="utf-8"><title>Duyệt 4 góc biển số</title>
+<style>
+:root{--border-light:#cbd5e1}body{font:14px system-ui;margin:12px;background:#f8fafc;color:#172033}
+.title{margin:0 0 3px 0;line-height:1.2}.header-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0}
+button,input,select{height:28px;box-sizing:border-box;padding:0 1rem;border:1px solid var(--border-light);border-radius:4px}
+button{background:#f1f5f9;color:#172033;font-weight:600;cursor:pointer}
+canvas{max-width:100%;border:1px solid var(--border-light);background:white;cursor:crosshair;touch-action:none}
+label{display:inline-flex;gap:5px;align-items:center;white-space:nowrap}#reviewer{width:130px;padding:0 8px}#group{width:140px;padding:0 8px}#message{color:#9a3412}p{margin:5px 0;font-size:12px;line-height:1.35}#save-status:empty{display:none}
+</style>
+<header class="header"><h2 class="title">Duyệt 4 góc biển số</h2>
+<div>Chọn đúng TL → TR → BR → BL theo ảnh. Kiểm tra đủ biển trong ảnh; loại ảnh nhiều biển chưa gán đủ, góc khuất hoặc không chắc chắn.</div>
+<div class="header-actions"><label>Người duyệt<input id="reviewer" placeholder="Tên người duyệt"></label><label>Nhóm<input id="group" aria-label="Nhóm chống rò rỉ"></label><label>Lọc<select id="review-filter" aria-label="Lọc trạng thái duyệt"><option value="all">Tất cả</option><option value="unreviewed">Chưa duyệt</option><option value="reviewed">Đã duyệt</option></select></label><select id="geometry-mode" aria-label="Cách đặt bốn góc"><option value="points">Chọn điểm</option><option value="rectangle">Kéo hình chữ nhật</option><option value="square">Kéo hình vuông</option></select><button id="prev">Trước</button><button id="next">Sau</button><button id="clear">Đặt lại 4 điểm</button><button id="approve">Duyệt</button><button id="save">Lưu</button><button id="exclude">Loại</button><button id="export">Tải reviews.json</button><input id="load" type="file" accept=".json" aria-label="Tệp reviews.json"></div></header>
+<p id="save-status" role="status"></p>
+<p id="status"></p><p id="message">Đề xuất tự động chưa được duyệt. Màu cam = chưa duyệt; xanh = đã duyệt.</p>
+<p>Ảnh cùng xe/lượt chụp/chuỗi camera phải có cùng nhóm, kể cả khác camera. Mặc định giữ cả nguồn trong một nhóm; chỉ chia nhỏ khi có metadata xác thực.</p>
+<canvas id="canvas"></canvas>
+<script>
+const manifest=/*MANIFEST*/null;
+const server=/*SERVER*/null;
+let rows=manifest.records, index=server?.cursor||0, image=new Image(), clicks=[];
+let saveTimer=null, pending=Promise.resolve(), unsaved=0, blocked=false, actionBusy=false;
+let geometryMode='points', drag=null;
+let reviewFilter='all', hasImage=true;
+const el=id=>document.getElementById(id), canvas=el('canvas'), ctx=canvas.getContext('2d');
+const fields=['points','reviewed','reviewer','group','group_reviewed','exclude'];
+function saveMessage(text){el('save-status').textContent=text}
+function queueSave(cursorOverride=index){
+ if(!hasImage)return Promise.resolve();
+ if(!server){saveMessage('Chế độ offline: tải reviews.json để lưu tiến độ.');return Promise.resolve()}
+ if(blocked)return Promise.reject(Error('Đang có lỗi lưu; tải JSON để giữ thay đổi rồi tải lại trang.'));
+ const row=rows[index], cursor=cursorOverride, edit=JSON.parse(JSON.stringify(Object.fromEntries(fields.map(k=>[k,row[k]??(k==='reviewer'?'':null)]))));unsaved++;
+ saveMessage('Đang lưu vào máy chủ...');
+ pending=pending.then(async()=>{
+  if(blocked)throw Error('Lưu đã dừng vì có xung đột trước đó.');
+  const response=await fetch('/api/record',{method:'POST',headers:{'Content-Type':'application/json','X-Review-Request':'1'},body:JSON.stringify({id:row.id,version:row._version||0,edit,cursor})});
+  if(!response.ok){let message=response.status===409?'Ảnh đã được sửa trên máy khác. Tải JSON giữ bản hiện tại rồi tải lại trang.':'Không lưu được. Kiểm tra kết nối; tải JSON để giữ tiến độ.';throw Error(message)}
+  const result=await response.json();row._version=result.version;unsaved--;if(!unsaved)saveMessage('Đã lưu vào máy chủ lúc '+new Date().toLocaleTimeString());
+ }).catch(error=>{blocked=true;saveMessage('CHƯA LƯU: '+error.message);throw error});
+ pending.catch(()=>{});return pending;
+}
+function scheduleSave(){if(!server)return;clearTimeout(saveTimer);saveMessage('Có thay đổi chưa lưu...');saveTimer=setTimeout(()=>{saveTimer=null;queueSave().catch(()=>{})},600)}
+function flushSave(cursor=index){clearTimeout(saveTimer);saveTimer=null;saveFields();return queueSave(cursor)}
+function matchesFilter(row){return !row.exclude&&(reviewFilter==='all'||(reviewFilter==='reviewed'?row.reviewed:!row.reviewed))}
+function available(start,delta=1){for(let count=0;count<rows.length;count++){let candidate=((start+count*delta)%rows.length+rows.length)%rows.length;if(matchesFilter(rows[candidate]))return candidate}return -1}
+function updateControls(){for(const id of ['approve','save','clear','exclude','prev','next','reviewer','group','geometry-mode'])el(id).disabled=actionBusy||!hasImage;el('review-filter').disabled=actionBusy}
+function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0);let r=rows[index];ctx.strokeStyle=!drag&&r.reviewed?'#16a34a':'#ea580c';ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=Math.max(2,canvas.width/600);ctx.font=`${Math.max(14,canvas.width/90)}px sans-serif`;const p=drag?.points||r.points||[];ctx.beginPath();p.forEach(([x,y],i)=>{x*=canvas.width;y*=canvas.height;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});if(p.length===4)ctx.closePath();ctx.stroke();p.forEach(([x,y],i)=>{x*=canvas.width;y*=canvas.height;ctx.beginPath();ctx.arc(x,y,Math.max(4,canvas.width/300),0,7);ctx.fill();ctx.fillText(['TL','TR','BR','BL'][i],x+8,y-8)})}
+function pointerPoint(event){const box=canvas.getBoundingClientRect();return [Math.max(0,Math.min(1,(event.clientX-box.left)/box.width)),Math.max(0,Math.min(1,(event.clientY-box.top)/box.height))]}
+function dragCorners(start,end,square){let [x0,y0]=[start[0]*canvas.width,start[1]*canvas.height], [x1,y1]=[end[0]*canvas.width,end[1]*canvas.height];if(square){const sx=x1<x0?-1:1,sy=y1<y0?-1:1;const side=Math.min(Math.max(Math.abs(x1-x0),Math.abs(y1-y0)),sx>0?canvas.width-x0:x0,sy>0?canvas.height-y0:y0);x1=x0+sx*side;y1=y0+sy*side}const left=Math.min(x0,x1)/canvas.width,right=Math.max(x0,x1)/canvas.width,top=Math.min(y0,y1)/canvas.height,bottom=Math.max(y0,y1)/canvas.height;return [[left,top],[right,top],[right,bottom],[left,bottom]]}
+el('geometry-mode').onchange=()=>{geometryMode=el('geometry-mode').value;drag=null;clicks=[];draw()};
+canvas.onpointerdown=event=>{if(actionBusy||geometryMode==='points'||(event.button!==undefined&&event.button!==0))return;drag={pointerId:event.pointerId,imageId:rows[index].id,start:pointerPoint(event),points:[]};canvas.setPointerCapture?.(event.pointerId);event.preventDefault?.()};
+canvas.onpointermove=event=>{if(!drag||event.pointerId!==drag.pointerId)return;drag.points=dragCorners(drag.start,pointerPoint(event),geometryMode==='square');draw()};
+canvas.onpointerup=event=>{if(!drag||event.pointerId!==drag.pointerId)return;if(drag.imageId!==rows[index].id){drag=null;draw();return}const points=dragCorners(drag.start,pointerPoint(event),geometryMode==='square');drag=null;canvas.releasePointerCapture?.(event.pointerId);if((points[1][0]-points[0][0])*canvas.width>=3&&(points[3][1]-points[0][1])*canvas.height>=3){rows[index].points=points;rows[index].reviewed=false;clicks=[];scheduleSave()}draw()};
+canvas.onpointercancel=()=>{drag=null;draw()};
+function saveFields(){if(!hasImage)return;let r=rows[index];if(r.group!==el('group').value){r.reviewed=false;r.group_reviewed=false}if((r.reviewer||'')!==el('reviewer').value.trim())r.reviewed=false;r.group=el('group').value;r.reviewer=el('reviewer').value.trim()}
+function show(){drag=null;const next=available(index);hasImage=next>=0;updateControls();if(!hasImage){el('status').textContent=reviewFilter==='unreviewed'?'Không còn ảnh chưa duyệt.':reviewFilter==='reviewed'?'Chưa có ảnh đã duyệt.':'Không còn ảnh trong danh sách.';image.onload=null;canvas.hidden=true;ctx.clearRect(0,0,canvas.width,canvas.height);return}canvas.hidden=false;index=next;let r=rows[index];clicks=[];const matching=rows.filter(matchesFilter);el('status').textContent=`${index+1}/${rows.length} | Bộ lọc ${matching.indexOf(r)+1}/${matching.length} | Đã duyệt ${rows.filter(x=>x.reviewed&&!x.exclude).length} | Loại ${rows.filter(x=>x.exclude).length} | ${r.aliases.join(', ')} | ${r.proposal}`;el('group').value=r.group;if(r.reviewer)el('reviewer').value=r.reviewer;image.onload=()=>{canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;draw()};image.src=r.image}
+canvas.onclick=e=>{if(actionBusy||geometryMode!=='points')return;if(clicks.length===4)clicks=[];clicks.push(pointerPoint(e));rows[index].points=clicks.map(p=>[...p]);rows[index].reviewed=false;draw();scheduleSave()};
+el('clear').onclick=()=>{drag=null;clicks=[];rows[index].points=[];rows[index].reviewed=false;draw();scheduleSave()};
+function completeAction(target){const destination=target<0?index:target;if(!server){index=destination;show();return Promise.resolve()}actionBusy=true;updateControls();return flushSave(destination).then(()=>{index=destination;show()}).catch(()=>{}).finally(()=>{actionBusy=false;updateControls()})}
+el('review-filter').onchange=()=>{const selected=el('review-filter').value;el('review-filter').value=reviewFilter;if(actionBusy||!['all','unreviewed','reviewed'].includes(selected))return;const apply=()=>{reviewFilter=selected;el('review-filter').value=selected;show()};if(!hasImage||!server){saveFields();apply();return Promise.resolve()}drag=null;actionBusy=true;updateControls();return flushSave().then(apply).catch(()=>{}).finally(()=>{actionBusy=false;updateControls()})};
+el('approve').onclick=()=>{if(actionBusy)return;saveFields();let r=rows[index];if(r.points.length!==4||!r.group.trim()||!el('reviewer').value.trim()){alert('Cần 4 điểm, nhóm và tên người duyệt.');return}r.group_reviewed=true;r.reviewed=true;r.reviewer=el('reviewer').value.trim();return completeAction(available(index+1))};
+function navigate(delta){if(actionBusy)return;drag=null;saveFields();if(!server){const target=available(index+delta,delta);if(target>=0)index=target;show();return}return flushSave().then(()=>{const target=available(index+delta,delta);if(target>=0)index=target;show()}).catch(()=>{})}
+el('prev').onclick=()=>navigate(-1);el('next').onclick=()=>navigate(1);
+document.onkeydown=event=>{if(event.isComposing||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey)return;const target=event.target;if(['INPUT','TEXTAREA','SELECT'].includes(target?.tagName)||target?.isContentEditable||target?.closest?.('[contenteditable="true"],[role="textbox"]'))return;const id={Enter:'approve',ArrowLeft:'prev',ArrowRight:'next'}[event.key];if(!id)return;event.preventDefault();if(event.repeat||actionBusy||unsaved>0||drag||el(id).disabled)return;return el(id).onclick()};
+el('approve').title='Duyệt (Enter)';el('prev').title='Ảnh trước (←)';el('next').title='Ảnh sau (→)';
+el('save').onclick=()=>flushSave().catch(()=>{});
+for(const id of ['reviewer','group'])el(id).oninput=()=>{saveFields();draw();scheduleSave()};
+el('exclude').onclick=()=>{if(actionBusy)return;saveFields();rows[index].exclude=true;const target=available(index+1);return completeAction(target<0?index:target)};
+el('export').onclick=()=>{saveFields();const blob=new Blob([JSON.stringify({source_sha256:manifest.source_sha256,records:rows},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='reviews.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+el('load').onchange=async e=>{try{if(server)throw Error('Nạp JSON hàng loạt chỉ dùng offline để tránh ghi đè nhãn từ máy khác.');const loaded=JSON.parse(await e.target.files[0].text());if(loaded.source_sha256!==manifest.source_sha256||loaded.records.length!==rows.length)throw Error('Sai bộ dữ liệu');const map=new Map(loaded.records.map(r=>[r.id,r]));if(map.size!==rows.length||!rows.every(r=>map.has(r.id)))throw Error('Sai ID');rows=rows.map(r=>({...r,...Object.fromEntries(['points','reviewed','reviewer','group','group_reviewed','exclude'].filter(k=>k in map.get(r.id)).map(k=>[k,map.get(r.id)[k]]))}));show()}catch(error){alert(error.message)}};
+if(server){window.addEventListener('beforeunload',event=>{if(saveTimer||unsaved){event.preventDefault();event.returnValue=''}});el('load').hidden=true;el('load').disabled=true;saveMessage('Đã nạp tiến độ từ máy chủ.')}else saveMessage('Offline: tải reviews.json để lưu tiến độ.');
+show();
+</script></html>

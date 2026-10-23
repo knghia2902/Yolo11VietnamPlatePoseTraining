@@ -1,0 +1,23 @@
+# Data, private annotations, checkpoints and local environments stay outside Git.
+__pycache__/
+.venv/
+*.zip
+*.pt
+*.onnx
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.webp
+*.log
+dataset*/
+reviews.json
+manifest.json
+proposals.json
+ocr-summary.json
+credentials.json
+saved-reviews/
+group-reviews/
+group-history/
+crops/
+*.lock
