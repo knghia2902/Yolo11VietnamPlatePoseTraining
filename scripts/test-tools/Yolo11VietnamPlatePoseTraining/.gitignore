@@ -24,3 +24,4 @@ credentials.json
 *.bmp
 *.webp
 .venv/
+*.private.json

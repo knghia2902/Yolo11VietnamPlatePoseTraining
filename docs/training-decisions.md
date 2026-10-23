@@ -42,3 +42,18 @@ types. Keep review state and OCR text outside Git with source-manifest binding,
 revision conflicts and persisted history. Package v3 only after human review;
 train from pretrained because v2 has already trained on the proposed car holdout.
 See docs/anpr-car-group-review.md. No runtime capability or database change.
+
+### 2026-10-23 — Approved v3 exclusions and reviewed vehicle validation
+
+Owner explicitly excluded the seven remaining unreviewed car images. Exclude
+them from v3 while retaining originals and a private source-bound receipt; do
+not auto-approve their OCR or labels. Keep the 844 approved car images grouped
+by reviewed plates/manual groups and transitive exact/pixel/dHash edges. Keep
+motorcycle sources whole: green train, bv1/cam validation. Both splits contain
+both vehicle types: train 675 cars/1748 motorcycles; validation 169 cars/1472
+motorcycles. Preserve existing corner labels and image bytes. Ship a separate
+v3 notebook/cache/checkpoint namespace, pin the new ZIP/manifest and train from
+pretrained; v1/v2 checkpoints cannot establish v3 holdout performance. Publish
+code/notebook/docs/tests to the owner's standalone training repository, keeping
+data, review receipts, OCR strings, credentials and models outside Git. No new
+Gate/runtime capability or database change. See docs/anpr-pose-mixed-v3.md.

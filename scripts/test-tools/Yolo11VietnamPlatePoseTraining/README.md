@@ -7,12 +7,13 @@ Công cụ chuẩn bị dữ liệu, duyệt nhãn và huấn luyện YOLO11n-Po
 1. Đọc [hướng dẫn chuẩn bị dữ liệu](../../../docs/anpr-pose-training-preparation.md): loại trùng, đề xuất contour, duyệt bốn góc thật và nhóm xe, rồi xuất gói đã xác minh.
 2. Dùng `serve_pose_review.py` để duyệt qua LAN và lưu trên máy chủ; `review_pose.html` là giao diện duyệt góc. Không dùng bốn góc bounding box cũ làm nhãn thật mà chưa kiểm tra.
 3. Đọc [bộ mixed v2](../../../docs/anpr-pose-mixed-v2.md) trước khi dùng notebook v2. Train v2 có ô tô và xe máy, validation v2 chỉ có xe máy.
-4. Để có validation ô tô, thực hiện [duyệt nhóm ô tô bằng đề xuất OCR](../../../docs/anpr-car-group-review.md). `car_group_review.py` chạy OCR cục bộ, lưu duyệt có phiên bản và chỉ lập kế hoạch chia mới sau khi duyệt đủ. V3 chưa được phát hành; kế hoạch chia chưa phải bộ train hoàn chỉnh.
+4. Bộ v3 dùng [nhóm ô tô đã duyệt và validation hỗn hợp](../../../docs/anpr-pose-mixed-v3.md). Đã loại 7 ảnh còn chưa duyệt theo yêu cầu owner; 4.064 ảnh còn lại có cả ô tô và xe máy trong mỗi split. `package_reviewed_vehicle_v3.py` yêu cầu đúng số ảnh chưa duyệt được phép loại, chốt snapshot có khóa, kiểm tra dữ liệu rồi tạo ZIP và notebook khớp hash. Đọc [hướng dẫn duyệt nhóm](../../../docs/anpr-car-group-review.md) nếu chuẩn bị bộ dữ liệu khác.
 
 Chạy script từ root repository. Chuẩn bị dữ liệu và kiểm thử nhẹ cần Python với Pillow; đề xuất contour cần OpenCV/NumPy. OCR nhóm ô tô dùng môi trường Python 3.12 riêng với `rapidocr_onnxruntime==1.4.4` và Pillow. Notebook tự cài phiên bản thư viện train đã pin trên Colab.
 
 ## Notebook Colab
 
+- [Train_YOLO11n_Plate_Pose_Mixed_v3.ipynb](Train_YOLO11n_Plate_Pose_Mixed_v3.ipynb): bộ mới, validation có ô tô và xe máy; có đánh giá và ảnh dự đoán riêng từng loại.
 - [Train_YOLO11n_Plate_Pose.ipynb](Train_YOLO11n_Plate_Pose.ipynb): bộ source-heldout ban đầu.
 - [Train_YOLO11n_Plate_Pose_Mixed_v2.ipynb](Train_YOLO11n_Plate_Pose_Mixed_v2.ipynb): cấu hình train mixed v2.
 

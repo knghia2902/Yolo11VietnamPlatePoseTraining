@@ -21,3 +21,4 @@ group-reviews/
 group-history/
 crops/
 *.lock
+*.private.json
