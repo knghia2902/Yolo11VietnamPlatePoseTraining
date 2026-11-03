@@ -4,6 +4,7 @@ __pycache__/
 *.zip
 *.pt
 *.onnx
+!models/yolo11-point-epoch61.onnx
 *.jpg
 *.jpeg
 *.png

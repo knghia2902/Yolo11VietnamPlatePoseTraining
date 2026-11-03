@@ -13,7 +13,8 @@ Model dùng **YOLO11n-Pose pretrained**, fine-tune thành đầu ra `kpt_shape: 
 - Cấu hình tối đa 100 epoch; quá trình dừng sớm sau **81 epoch**, khoảng **12,65 giờ**, do không cải thiện trong 20 epoch. Checkpoint tốt nhất tại **epoch 61**.
 - Trên tập validation 1.500 ảnh, kết quả của checkpoint tốt nhất: **box mAP@50: 0,995; box mAP@50–95: 0,904; pose mAP@50: 0,995; pose mAP@50–95: 0,995**. Đây là chỉ số đánh giá mô hình, không phải tỷ lệ OCR đọc đúng hay hiệu quả thực tế tại cổng.
 - Model dự đoán bốn góc để căn chỉnh phối cảnh trước OCR. Cần tiếp tục đánh giá trên dữ liệu thực tế độc lập, gồm biển nghiêng, hai dòng, mờ và thiếu sáng, cũng như tốc độ và tỷ lệ đọc đúng toàn bộ chuỗi OCR.
-- Checkpoint và ONNX không lưu trong Git. Model sử dụng thành phần Ultralytics; cần xem xét giấy phép AGPL-3.0 hoặc thỏa thuận cấp phép phù hợp trước khi phân phối ứng dụng đóng mã nguồn. Quyền sử dụng dữ liệu là vấn đề riêng.
+- Model ONNX epoch 61 dùng cho Gate: [models/yolo11-point-epoch61.onnx](models/yolo11-point-epoch61.onnx); SHA-256 `f678438d03dd08b2c68c477d9bdaead25b2852f643731dec5ee7c3594ae49fa7`. Checkpoint và dữ liệu ảnh không lưu trong Git.
+- Metadata model ghi AGPL-3.0. Model sử dụng thành phần Ultralytics; cần xem xét giấy phép hoặc thỏa thuận phù hợp trước khi phân phối ứng dụng đóng mã nguồn. Quyền sử dụng dữ liệu là vấn đề riêng.
 
 ## Mục lục
 
@@ -44,7 +45,7 @@ Model dùng **YOLO11n-Pose pretrained**, fine-tune thành đầu ra `kpt_shape: 
 
 **Duyệt góc đạt nghĩa là nhãn góc đủ yêu cầu train YOLO Point; không bắt buộc đã định danh biển số bằng OCR.** Trước khi đưa vào snapshot vẫn phải kiểm tra trùng và phân chia validation.
 
-Git lưu source, test, notebook sạch và hướng dẫn. **Ảnh thực, ZIP dataset, SQLite, manifest dữ liệu thực, weights, credentials và log giữ riêng ngoài Git.** Clone repository chưa đủ để tái chạy một snapshot nếu chưa có dữ liệu riêng tương ứng.
+Git lưu source, test, notebook sạch, hướng dẫn và model ONNX đã chọn. **Ảnh thực, ZIP dataset, SQLite, manifest dữ liệu thực, checkpoint, credentials và log giữ riêng ngoài Git.** Clone repository chưa đủ để tái chạy một snapshot nếu chưa có dữ liệu riêng tương ứng.
 
 ## 2. Source web và train nằm ở đâu?
 
