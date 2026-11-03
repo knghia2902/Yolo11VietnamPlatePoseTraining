@@ -6,6 +6,15 @@ Model dùng **YOLO11n-Pose pretrained**, fine-tune thành đầu ra `kpt_shape: 
 
 **1. Trên trái (TL) → 2. Trên phải (TR) → 3. Dưới phải (BR) → 4. Dưới trái (BL).**
 
+## Kết quả lượt huấn luyện ngày 02–03/11/2026
+
+- Dữ liệu gồm **10.000 ảnh huấn luyện** và **1.500 ảnh validation** riêng. Ảnh được kiểm tra, gán nhãn vùng biển số và bốn góc; cần tiếp tục xác minh quyền sử dụng theo từng nguồn.
+- Model nền: **YOLO11n-Pose pretrained**, fine-tune thành một lớp biển số và bốn điểm góc; sử dụng Ultralytics 8.4.183, kích thước ảnh 960 và GPU Tesla T4.
+- Cấu hình tối đa 100 epoch; quá trình dừng sớm sau **81 epoch**, khoảng **12,65 giờ**, do không cải thiện trong 20 epoch. Checkpoint tốt nhất tại **epoch 61**.
+- Trên tập validation 1.500 ảnh, kết quả của checkpoint tốt nhất: **box mAP@50: 0,995; box mAP@50–95: 0,904; pose mAP@50: 0,995; pose mAP@50–95: 0,995**. Đây là chỉ số đánh giá mô hình, không phải tỷ lệ OCR đọc đúng hay hiệu quả thực tế tại cổng.
+- Model dự đoán bốn góc để căn chỉnh phối cảnh trước OCR. Cần tiếp tục đánh giá trên dữ liệu thực tế độc lập, gồm biển nghiêng, hai dòng, mờ và thiếu sáng, cũng như tốc độ và tỷ lệ đọc đúng toàn bộ chuỗi OCR.
+- Checkpoint và ONNX không lưu trong Git. Model sử dụng thành phần Ultralytics; cần xem xét giấy phép AGPL-3.0 hoặc thỏa thuận cấp phép phù hợp trước khi phân phối ứng dụng đóng mã nguồn. Quyền sử dụng dữ liệu là vấn đề riêng.
+
 ## Mục lục
 
 - [1. Quy trình tổng thể](#1-quy-trình-tổng-thể)
