@@ -4,6 +4,8 @@ Công cụ chuẩn bị dữ liệu, duyệt nhãn và huấn luyện YOLO11n-Po
 
 ## Bắt đầu
 
+Web kiểm tra model sau mỗi lần train: xem [hướng dẫn test model](../../../docs/anpr-model-testing.md). Mục này mô tả entrypoint hiện tại, registry version, môi trường inference và kiểm tra trình duyệt.
+
 1. Đọc [hướng dẫn chuẩn bị dữ liệu](../../../docs/anpr-pose-training-preparation.md): loại trùng, đề xuất contour, duyệt bốn góc thật và nhóm xe, rồi xuất gói đã xác minh.
 2. Dùng `serve_pose_review.py` để duyệt qua LAN và lưu trên máy chủ; `review_pose.html` là giao diện duyệt góc. Không dùng bốn góc bounding box cũ làm nhãn thật mà chưa kiểm tra.
 3. Đọc [bộ mixed v2](../../../docs/anpr-pose-mixed-v2.md) trước khi dùng notebook v2. Train v2 có ô tô và xe máy, validation v2 chỉ có xe máy.
@@ -25,7 +27,13 @@ Các notebook được lưu không có output hay ảnh dữ liệu. ZIP dữ li
 
 Giữ toàn bộ nhóm xe/nguồn/lượt chụp và thành phần ảnh trùng/gần trùng ở một phía. OCR chỉ đề xuất, không tự duyệt; biển số cùng xe phải được xác nhận bằng mắt. dHash không chứng minh tuyệt đối không trùng xe ở góc khác. Nếu dùng ô tô từng ở train v2 làm validation mới, train lại từ pretrained để đánh giá; không resume model đã học các ảnh đó.
 
-## Kiểm thử
+## Test các model sau mỗi lần train
+
+Chạy web bằng `pose_model_test_server.py` với các tham số workspace/credentials/bind/port/allow-network như server duyệt, bổ sung `--model-root` (registry ngoài Git) và `--inference-python` (Python có Ultralytics/PyTorch tương thích). Trang `/model-test` cho chọn model, tải ảnh lên hoặc dùng nút **Test model** trên ảnh đang duyệt. Không lưu dự đoán vào nhãn và không tự duyệt ảnh.
+
+Đăng ký weights tin cậy từ một lượt train mới bằng `register_test_model.py --weights <best.pt> --version <run-id> --name <tên-model> --best-epoch <epoch>`, rồi bấm **Tải lại model**. Registry mặc định là `D:/ANPR-Training-Data/model-yolo-point`. Tiện ích sao chép riêng weights nhỏ vào registry, không sao chép ảnh; từ chối ghi đè version cũ. Worker kiểm tra model phải có đúng bốn điểm trước inference. Không nhận weights tải lên từ trình duyệt. Test trên CPU nên lần gọi đầu có thêm thời gian nạp model.
+
+### Kiểm thử tự động
 
 Từ root repository:
 

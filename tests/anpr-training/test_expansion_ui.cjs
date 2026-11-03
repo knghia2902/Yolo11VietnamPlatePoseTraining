@@ -1,0 +1,114 @@
+// Synthetic records only: approval navigation must wait for durable server success.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+let previewWrites=0;
+function element(){return {value:'',checked:false,hidden:false,disabled:false,textContent:'',tagName:'DIV',style:{},options:[],dataset:{},before(){},after(){},closest(){return this},querySelector(){return element()},querySelectorAll(){return []},addEventListener(){},parentElement:{append(){},clientWidth:800},setAttribute(){},click(){return this.onclick?.()},replaceChildren(){},append(){},removeAttribute(){},getContext(){return {clearRect(){},drawImage(){},getImageData(x,y,w,h){return {width:w,height:h,data:new Uint8ClampedArray(w*h*4).fill(120)}},createImageData(w,h){return {data:new Uint8ClampedArray(w*h*4)}},putImageData(){previewWrites++},beginPath(){},lineTo(){},moveTo(){},closePath(){},stroke(){},arc(){},fill(){},strokeText(){},fillText(){}}},getBoundingClientRect(){return {left:0,top:0,width:100,height:100}},setPointerCapture(){}}}
+const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id)};
+node('kind').value='acs';node('status').value='pending';node('mode').value='point';
+const points=[[.1,.1],[.9,.1],[.9,.9],[.1,.9]],records=[0,1].map(i=>({id:'synthetic'+i,kind:'acs',status:'ready',stage:'ready',plate:'59A1234'+i,points,near:[],identity_reviewed:false,version:0,preview:false,crop:false}));
+const writes=[],urls=[];let fail=false;
+const frames=new Map();let frameId=0;const flushFrames=()=>{for(const [id,callback] of frames){frames.delete(id);callback()}};
+const context=vm.createContext({URLSearchParams,location:{search:'?section=ocr'},structuredClone,console,requestAnimationFrame:fn=>{frames.set(++frameId,fn);return frameId},cancelAnimationFrame:id=>frames.delete(id),confirm:()=>true,Image:class{constructor(){this.complete=false}},document:{getElementById:node,createElement:element,querySelector:()=>element(),querySelectorAll:()=>[],activeElement:{tagName:'BODY'}},window:{},localStorage:{getItem:()=> 'Tester',setItem(){}},fetch:async(url,options)=>{
+ if(url.startsWith('/api/list')){urls.push(url);return {ok:true,json:async()=>({records:structuredClone(records),total:2,counts:{acs:2,validation:1},stages:{},validation_missing_identities:1})}};
+ const body=JSON.parse(options.body);writes.push(body);
+ return fail?{ok:false,json:async()=>({error:'Revision conflict'})}:{ok:true,json:async()=>({...records[0],version:body.version+1,status:'waiting_validation',...body.edit})};
+}});
+const source=fs.readFileSync(path.join(__dirname,'../../scripts/test-tools/Yolo11VietnamPlatePoseTraining/review_expansion.html'),'utf8').split('<script>')[1].split('</script>')[0];
+vm.runInContext(source,context);
+(async()=>{
+ await new Promise(setImmediate);
+ node('kind').value='acs';node('status').value='all';
+ assert.equal(vm.runInContext('current.id',context),'synthetic0');
+ const loading=vm.runInContext('load()',context);
+ assert.equal(node('kind').disabled,true);assert.equal(node('status').disabled,true);
+ await loading;assert.equal(node('kind').disabled,false);assert.equal(node('status').disabled,false);
+ // Corner-only sends no identity/duplicate decisions, and advances only after success.
+ node('single').checked=true;fail=true;
+ await node('approveCorners').onclick();assert.equal(vm.runInContext('current.id',context),'synthetic0');
+ assert.equal(writes.at(-1).action,'approve_corners');assert.deepEqual(Object.keys(writes.at(-1).edit).sort(),['points','reviewer','single_plate_reviewed']);
+ fail=false;await node('approveCorners').onclick();assert.equal(vm.runInContext('current.id',context),'synthetic1');
+ await vm.runInContext('load()',context);writes.length=0;
+ await node('approve').onclick();assert.equal(writes.length,0);assert.match(node('message').textContent,/kiểm tra biển số/);
+ node('identity').checked=true;node('single').checked=true;fail=true;
+ await node('approve').onclick();assert.equal(vm.runInContext('current.id',context),'synthetic0');assert.match(node('message').textContent,/conflict/);
+ fail=false;await node('approve').onclick();
+ assert.equal(writes.at(-1).edit.corners_reviewed,true);assert.equal(vm.runInContext('current.id',context),'synthetic1');
+ vm.runInContext('current.kind="validation";show()',context);
+ assert.equal(node('mode').disabled,false);assert.equal(node('exclude').disabled,true);
+ assert.equal(node('approveCorners').disabled,true);
+ // Frozen records permit local geometry changes, without dirtying or saving them.
+ const originalPoints=vm.runInContext('JSON.stringify(current.points)',context);
+ vm.runInContext('reviewSection="point";img.complete=true;img.naturalWidth=100;img.width=100;img.height=100;c.width=1000;c.height=1000',context);
+ const pointer=(x,y)=>({clientX:x,clientY:y,pointerId:1,preventDefault(){}});
+ node('canvas').onpointerdown(pointer(16,10));node('canvas').onpointermove(pointer(16,18));node('canvas').onpointerup();
+ assert.equal(vm.runInContext('dirty',context),false);
+ assert.notEqual(vm.runInContext('JSON.stringify(points)',context),originalPoints);
+ flushFrames();assert.ok(previewWrites>0);assert.match(vm.runInContext('cropNotice.textContent',context),/không lưu góc/);
+ await node('save').onclick();assert.equal(writes.at(-1).edit.corners_reviewed,false);
+ assert.equal(JSON.stringify(writes.at(-1).edit.points),originalPoints);
+ assert.equal(vm.runInContext('projectiveMap([[0,0],[1,0],[1,1],[0,1]]).join(",")',context),'1,0,0,0,1,0,0,0');
+ assert.equal(vm.runInContext('projectiveMap([[0,0],[1,1],[1,0],[0,1]])',context),null);
+ // Same pointer movement on an ACS candidate changes the saved points.
+ vm.runInContext('current.kind="acs";points=structuredClone(current.points);dirty=false',context);
+ node('canvas').onpointerdown(pointer(16,10));node('canvas').onpointermove(pointer(20,22));node('canvas').onpointerup();
+ assert.equal(vm.runInContext('dirty',context),true);await node('save').onclick();
+ assert.notEqual(JSON.stringify(writes.at(-1).edit.points),originalPoints);
+ // Empty/invalid geometry hides the old crop instead of presenting stale pixels.
+ vm.runInContext('points=[];renderCropPreview()',context);
+ assert.equal(vm.runInContext('liveCrop.hidden',context),true);assert.equal(node('crop').hidden,true);
+ vm.runInContext('reviewSection="ocr"',context);
+ let shortcuts=0;node('approve').onclick=()=>shortcuts++;
+ context.document.activeElement={tagName:'INPUT',type:'text'};
+ context.document.onkeydown({key:'Enter',preventDefault(){}});assert.equal(shortcuts,0);
+ context.document.activeElement={tagName:'INPUT',type:'checkbox'};
+ context.document.onkeydown({key:'Enter',preventDefault(){}});assert.equal(shortcuts,1);
+ context.document.onkeydown({key:'Enter',repeat:true,preventDefault(){}});assert.equal(shortcuts,1);
+ node('status').value='corners';
+ vm.runInContext("offset=0;index=records.length-1;total=100;records.forEach(r=>{r.corners_reviewed=true;r.status='waiting_validation'});dirty=false",context);
+ await vm.runInContext('move(1)',context);assert.match(urls.at(-1),/offset=0(?:&|$)/);
+ vm.runInContext("offset=0;index=records.length-1;total=100;records[0].corners_reviewed=true;records[1].corners_reviewed=false;records.forEach(r=>r.status='ready');dirty=false",context);
+ await vm.runInContext('move(1)',context);assert.match(urls.at(-1),/offset=1(?:&|$)/);
+ node('status').value='uncertain';
+ node('status').value='corners';
+ node('kind').value='all';
+ vm.runInContext('reviewSection="point"',context);
+ assert.equal(vm.runInContext("remainsInFilter({corners_reviewed:false,status:'ready'})",context),true);
+ assert.equal(vm.runInContext("remainsInFilter({corners_reviewed:true,status:'waiting_validation'})",context),false);
+ assert.equal(vm.runInContext("remainsInFilter({corners_reviewed:false,status:'excluded'})",context),false);
+ node('status').value='uncertain';
+ vm.runInContext('reviewSection="ocr"',context);
+ assert.equal(vm.runInContext("remainsInFilter({triage:{category:'ocr_uncertain'}})",context),true);
+ assert.equal(vm.runInContext("remainsInFilter({triage:{category:'ocr_distinct'}})",context),false);
+ node('status').value='matched';
+ assert.equal(vm.runInContext("remainsInFilter({triage:{category:'confirmed_overlap'}})",context),true);
+ node('status').value='distinct';
+ assert.equal(vm.runInContext("remainsInFilter({triage:{category:'ocr_pending'}})",context),false);
+ node('kind').value='acs';node('status').value='corners';node('vehicle').value='car';
+ let cursor;context.localStorage.setItem=(key,value)=>{if(key==='expansionCursorV2_ocr')cursor=JSON.parse(value)};
+ vm.runInContext('offset=999;index=0;current={id:"stable-id"};remember()',context);
+ assert.equal(cursor.position,999);assert.equal(cursor.id,'stable-id');assert.equal(cursor.vehicle,'car');
+ vm.runInContext('dirty=false;busy=false',context);await node('reload').onclick();await new Promise(resolve=>setImmediate(resolve));
+ assert.match(urls.at(-1),/anchor=stable-id/);assert.match(urls.at(-1),/offset=999/);
+ node('jump').value='2';vm.runInContext('busy=false;dirty=false;total=100',context);await node('go').onclick();await new Promise(resolve=>setImmediate(resolve));assert.match(urls.at(-1),/offset=1(?:&|$)/);
+ const restoredContext=vm.createContext({...context,location:{search:'?section=point'},localStorage:{getItem:key=>key==='expansionCursorV2_point'?JSON.stringify({kind:'acs',status:'corners',vehicle:'motorcycle',position:999,id:'restored-id'}):'Tester',setItem(){}}});
+ vm.runInContext(source,restoredContext);await new Promise(resolve=>setImmediate(resolve));
+ assert.match(urls.at(-1),/offset=999/);assert.match(urls.at(-1),/anchor=restored-id/);assert.match(urls.at(-1),/vehicle=motorcycle/);
+ vm.runInContext('busy=false;dirty=false;index=0;records[0].preview=true;records[0].crop=true;show();img.complete=true;img.naturalWidth=100;img.width=100;img.height=100;img.onload()',context);
+ const beforeReloadPreview=previewWrites;flushFrames();assert.ok(previewWrites>beforeReloadPreview,'Opening a corrected image must regenerate crop from current points');
+ assert.equal(node('crop').hidden,true,'Do not display stale server OCR crop');
+ assert.equal(vm.runInContext('liveCrop.hidden',context),false);
+ // Crossing either page boundary must preserve adjacent IDs and ordinals.
+ const navigationRows=Array.from({length:100},(_,i)=>({...records[0],id:'nav'+i,status:'ready',corners_reviewed:false,preview:false}));
+ context.fetch=async url=>{const offset=Number(new URL(url,'http://localhost').searchParams.get('offset'));return {ok:true,json:async()=>({records:structuredClone(navigationRows.slice(offset,offset+40)),offset,total:navigationRows.length,counts:{},stages:{}})}};
+ node('status').value='all';node('vehicle').value='all';
+ vm.runInContext('offset=40;index=0;resumeAnchor="";busy=false;dirty=false',context);await vm.runInContext('load()',context);
+ await vm.runInContext('move(-1)',context);assert.equal(vm.runInContext('current.id',context),'nav39');assert.equal(node('position').textContent,'40 / 100');
+ await vm.runInContext('move(1)',context);assert.equal(vm.runInContext('current.id',context),'nav40');assert.equal(node('position').textContent,'41 / 100');
+ vm.runInContext('offset=0;resumeAnchor=""',context);await vm.runInContext('load()',context);
+ vm.runInContext('index=39;show()',context);await vm.runInContext('move(1)',context);assert.equal(vm.runInContext('current.id',context),'nav40');
+ // Removing the reviewed current image immediately contracts the queue once.
+ node('status').value='corners';vm.runInContext('offset=0;resumeAnchor=""',context);await vm.runInContext('load()',context);
+ vm.runInContext('current.corners_reviewed=true',context);await vm.runInContext('move(1)',context);
+ assert.equal(vm.runInContext('current.id',context),'nav1');assert.equal(node('position').textContent,'1 / 99');
+ await vm.runInContext('move(1)',context);assert.equal(vm.runInContext('current.id',context),'nav2');assert.equal(node('position').textContent,'2 / 99');
+ console.log('Expansion UI: durable approval, adjacent page navigation, queue contraction and frozen validation passed');
+})().catch(e=>{console.error(e);process.exitCode=1});

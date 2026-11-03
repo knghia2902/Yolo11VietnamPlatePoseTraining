@@ -25,3 +25,10 @@ credentials.json
 *.webp
 .venv/
 *.private.json
+
+# Private runtime databases and inference outputs.
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log

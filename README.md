@@ -1,6 +1,10 @@
 # YOLO11 Pose — bốn góc biển số Việt Nam
 
-Công cụ chuẩn bị dữ liệu, duyệt nhãn và huấn luyện YOLO11n-Pose với thứ tự góc **TL → TR → BR → BL**, `kpt_shape: [4, 3]`. Mỗi ảnh hiện hỗ trợ một biển số. Đây là tooling huấn luyện độc lập, chưa tích hợp model vào Gate.
+Công cụ chuẩn bị dữ liệu, duyệt nhãn và huấn luyện YOLO11n-Pose với thứ tự góc **TL → TR → BR → BL**, `kpt_shape: [4, 3]`. Mỗi ảnh hiện hỗ trợ một biển số. Đây là repository độc lập để chuẩn bị dữ liệu, huấn luyện và kiểm tra model biển số.
+
+## Test model sau mỗi lần train
+
+Xem [hướng dẫn chạy web và đăng ký model](docs/anpr-model-testing.md). Web có các tab Train YOLO point, OCR biển số và Test model; hỗ trợ ảnh tải lên hoặc ảnh đang duyệt, hiển thị bốn góc và ảnh nắn. Dự đoán không tự ghi đè nhãn đã duyệt.
 
 ## Bắt đầu
 
