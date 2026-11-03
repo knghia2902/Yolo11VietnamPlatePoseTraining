@@ -1,0 +1,2 @@
+# Lightweight review/model-test server; inference may use a separate interpreter.
+Pillow==11.3.0

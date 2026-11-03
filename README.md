@@ -4,6 +4,27 @@ Công cụ chuẩn bị dữ liệu, duyệt nhãn và huấn luyện YOLO11n-Po
 
 ## Test model sau mỗi lần train
 
+### Source web nằm ở đây
+
+| Thành phần | File |
+|---|---|
+| Khởi chạy web từ root | [Start-Web.ps1](Start-Web.ps1) |
+| Backend web duyệt + test model | [pose_model_test_server.py](scripts/test-tools/Yolo11VietnamPlatePoseTraining/pose_model_test_server.py) |
+| Giao diện Train YOLO point / OCR | [review_expansion.html](scripts/test-tools/Yolo11VietnamPlatePoseTraining/review_expansion.html) |
+| Giao diện Test model | [review_model_test.html](scripts/test-tools/Yolo11VietnamPlatePoseTraining/review_model_test.html) |
+| Worker chạy model và nắn biển | [pose_model_test_worker.py](scripts/test-tools/Yolo11VietnamPlatePoseTraining/pose_model_test_worker.py) |
+| Đăng ký model mới | [register_test_model.py](scripts/test-tools/Yolo11VietnamPlatePoseTraining/register_test_model.py) |
+| Notebook 10.000 train / 1.500 validation | [Train_YOLO11_Point_10000.ipynb](scripts/test-tools/Yolo11VietnamPlatePoseTraining/Train_YOLO11_Point_10000.ipynb) |
+
+Đây là web Python có backend và dữ liệu riêng, không phải website tĩnh chạy bằng GitHub Pages. GitHub lưu đầy đủ source; chạy web bằng `Start-Web.ps1` trên máy chứa workspace/model. Xem [requirements-web.txt](requirements-web.txt), [requirements-inference.txt](requirements-inference.txt) và [hướng dẫn](docs/anpr-model-testing.md).
+
+```powershell
+.\Start-Web.ps1 -Workspace D:/private/expansion -Credentials D:/private/secrets/review.json `
+  -ModelRoot D:/private/models -InferencePython D:/private/inference-venv/Scripts/python.exe
+```
+
+Muốn phục vụ trong LAN, bổ sung `-Bind 0.0.0.0 -AllowNetwork 10.32.0.0/16`. Giữ Basic Auth và firewall phù hợp.
+
 Xem [hướng dẫn chạy web và đăng ký model](docs/anpr-model-testing.md). Web có các tab Train YOLO point, OCR biển số và Test model; hỗ trợ ảnh tải lên hoặc ảnh đang duyệt, hiển thị bốn góc và ảnh nắn. Dự đoán không tự ghi đè nhãn đã duyệt.
 
 ## Bắt đầu
